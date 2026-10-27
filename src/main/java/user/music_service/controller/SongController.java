@@ -1,4 +1,3 @@
-
 package user.music_service.controller;
 
 import java.io.IOException;
@@ -13,6 +12,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import lombok.RequiredArgsConstructor;
 import user.music_service.handler.AppException;
+import user.music_service.service.HlsService;
 import user.music_service.service.PlaybackService;
 import user.music_service.service.SongService;
 
@@ -23,6 +23,7 @@ public class SongController {
 
     private final PlaybackService playbackService;
     private final SongService songService;
+    private final HlsService hlsService;
 
     @GetMapping("/playback-token")
     public ResponseEntity<?> getPlaybackToken(
@@ -37,5 +38,13 @@ public class SongController {
             @PathVariable UUID songId) throws AppException, IOException {
 
         return songService.streamSong(songId);
+    }
+
+    @GetMapping("/hls/{assetName:.+}")
+    public ResponseEntity<StreamingResponseBody> getHlsAsset(
+            @PathVariable UUID songId,
+            @PathVariable String assetName) throws AppException {
+
+        return hlsService.getAsset(songId, assetName);
     }
 }
