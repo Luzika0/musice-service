@@ -16,7 +16,8 @@ import lombok.Data;
 @Entity
 @Table(name = "playback_sessions", indexes = {
         @Index(name = "idx_playback_token_hash", columnList = "token_hash"),
-        @Index(name = "idx_playback_expires_at", columnList = "expires_at")
+        @Index(name = "idx_playback_expires_at", columnList = "expires_at"),
+        @Index(name = "idx_playback_hls_session_hash", columnList = "hls_session_hash")
 })
 public class PlaybackSession {
     @Id
@@ -25,6 +26,9 @@ public class PlaybackSession {
 
     @Column(name = "token_hash", nullable = false, unique = true, length = 64)
     private String tokenHash;
+
+    @Column(name = "hls_session_hash", unique = true, length = 64)
+    private String hlsSessionHash;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;
