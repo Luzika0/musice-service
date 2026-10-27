@@ -51,7 +51,7 @@ public class SongServiceImpl implements SongService {
 
     private final PlaybackService playbackService;
 
-    private final HlsProcessingService hlsProcessingService;
+    private final HlsService hlsService;
 
     private final UserRepository userRepository;
     private final RequestHeaderData requestHeaderData;
@@ -215,7 +215,7 @@ public class SongServiceImpl implements SongService {
                         file.getSize()));
 
         try {
-            hlsProcessingService.processSong(uuid, objectKey);
+            hlsService.processSong(uuid, objectKey);
         } catch (IOException | RuntimeException exception) {
             // Do not create a playable song record when HLS generation fails.
             try {
