@@ -85,7 +85,8 @@ public class HlsController {
     }
 
     private boolean isAllowedAssetName(String assetName) {
-        return "index.m3u8".equals(assetName)
+        return "master.m3u8".equals(assetName)
+                || "index.m3u8".equals(assetName)
                 || "key".equals(assetName)
                 || assetName.matches("segment_\\d+\\.ts");
     }
