@@ -51,6 +51,8 @@ public class SongServiceImpl implements SongService {
 
     private final PlaybackService playbackService;
 
+    private final HlsProcessingService hlsProcessingService;
+
     private final UserRepository userRepository;
     private final RequestHeaderData requestHeaderData;
     private final ArtistRepository artistRepository;
@@ -169,7 +171,8 @@ public class SongServiceImpl implements SongService {
                     Constant.NOT_ENOUGH_PERMISSION_PERMISSION);
         }
 
-        if (artistRepository.findById(request.getArtistId()).get() == null) {
+        if (request.getArtistId() == null
+                || artistRepository.findById(request.getArtistId()).isEmpty()) {
             throw new AppException(ErrorCode.NOT_FOUND,
                     Constant.THIS_ARTIST_WITH_ID + request.getArtistId() + Constant.NOT_FOUND);
         }
@@ -210,6 +213,20 @@ public class SongServiceImpl implements SongService {
                 RequestBody.fromInputStream(
                         file.getInputStream(),
                         file.getSize()));
+
+        try {
+            hlsProcessingService.processSong(uuid, objectKey);
+        } catch (IOException | RuntimeException exception) {
+            // Do not create a playable song record when HLS generation fails.
+            try {
+                s3Client.deleteObject(builder -> builder.bucket(bucket).key(objectKey));
+            } catch (RuntimeException cleanupException) {
+                exception.addSuppressed(cleanupException);
+            }
+            throw new AppException(
+                    ErrorCode.BAD_REQUEST,
+                    "HLS processing failed. Check that FFmpeg is installed and configured.");
+        }
 
         Song songEntity = new Song();
         songEntity.setSongId(uuid);
