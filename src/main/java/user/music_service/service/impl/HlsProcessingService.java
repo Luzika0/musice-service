@@ -118,10 +118,10 @@ public class HlsProcessingService {
             }
             Path masterPlaylist = outputDir.resolve("master.m3u8");
             Files.writeString(masterPlaylist,
-                    "#EXTM3U\\n"
-                            + "#EXT-X-VERSION:3\\n"
-                            + "#EXT-X-STREAM-INF:BANDWIDTH=160000,CODECS=\\"mp4a.40.2\\"\\n"
-                            + "index.m3u8\\n");
+                    "#EXTM3U\n"
+                            + "#EXT-X-VERSION:3\n"
+                            + "#EXT-X-STREAM-INF:BANDWIDTH=160000,CODECS=\\"mp4a.40.2\\"\n"
+                            + "index.m3u8\n");
             putFile(prefix + "index.m3u8", playlist, "application/vnd.apple.mpegurl");
             putFile(prefix + "master.m3u8", masterPlaylist, "application/vnd.apple.mpegurl");
         } finally {
