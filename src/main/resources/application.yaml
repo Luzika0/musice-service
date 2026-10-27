@@ -29,7 +29,7 @@ cloudflare:
     r2:
         account-id: ${CLOUD_FLARE_R2_ACC_ID}
         bucket: music
-        access-key-id: ${ACESS_KEY}
+        access-key-id: ${ACCESS_KEY}
         secret-access-key: ${SECRET_KEY}
 playback:
     expiration: 300
