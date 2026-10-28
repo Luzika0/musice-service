@@ -49,16 +49,11 @@ public class PlaybackServiceImpl implements PlaybackService {
             throw new AppException(ErrorCode.UNAUTHURIZED, "User must be authenticated.");
         }
 
-        /*
-         * PostgreSQL transaction-scoped advisory lock: concurrent playback requests
-         * for this user are serialized even when Cloud Run serves them on different
-         * instances. The lock is automatically released when this transaction ends.
-         */
+        
         entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(CAST(:userId AS BIGINT))")
                 .setParameter("userId", userId.longValue())
                 .getSingleResult();
 
-        // Revoke instead of deleting: old tokens remain identifiable as revoked.
         var previousSessions = playbackSessionRepository.findAllByUserId(userId.longValue());
         for (PlaybackSession previous : previousSessions) {
             if (!previous.isRevoked()) {

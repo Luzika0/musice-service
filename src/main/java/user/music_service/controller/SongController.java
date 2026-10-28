@@ -30,10 +30,7 @@ public class SongController {
         return ResponseEntity.ok().body(playbackService.createSession(songId));
     }
 
-    /**
-     * The active player polls this endpoint while playing. Once another device
-     * starts playback, its old token is revoked and this endpoint reports active=false.
-     */
+
     @GetMapping("/playback-status")
     public ResponseEntity<?> getPlaybackStatus(@PathVariable UUID songId) {
         boolean active = playbackService.isSessionActive(

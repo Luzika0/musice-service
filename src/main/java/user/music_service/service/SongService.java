@@ -23,6 +23,13 @@ public interface SongService {
 
     GeneralResponse deleteArtist(Integer artistId) throws AppException;
 
+    GeneralResponse deleteSong(Integer songId)
+            throws AppException, InvalidRequestException, InvalidWriteOffsetException, TooManyPartsException,
+            EncryptionTypeMismatchException, S3Exception, AwsServiceException, SdkClientException, IOException;
+
+    GeneralResponse listSong(Integer page, Integer size, String searchText)
+            throws AppException;
+
     GeneralResponse uploadSongs(SongRequest request)
             throws AppException, InvalidRequestException, InvalidWriteOffsetException, TooManyPartsException,
             EncryptionTypeMismatchException, S3Exception, AwsServiceException, SdkClientException, IOException;

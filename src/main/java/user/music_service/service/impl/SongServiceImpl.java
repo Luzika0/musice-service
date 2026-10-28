@@ -336,4 +336,19 @@ public class SongServiceImpl implements SongService {
             log.warn("Could not clean up R2 object {}", key, exception);
         }
     }
+
+    @Override
+    public GeneralResponse deleteSong(Integer songId)
+            throws AppException, InvalidRequestException, InvalidWriteOffsetException, TooManyPartsException,
+            EncryptionTypeMismatchException, S3Exception, AwsServiceException, SdkClientException, IOException {
+        
+        throw new UnsupportedOperationException("Unimplemented method 'deleteSong'");
+    }
+
+    @Override
+    public GeneralResponse listSong(Integer page, Integer size, String searchText)
+            throws AppException {
+        
+        throw new UnsupportedOperationException("Unimplemented method 'listSong'");
+    }
 }
