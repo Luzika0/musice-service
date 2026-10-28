@@ -25,6 +25,7 @@ import user.music_service.handler.AppException;
 import user.music_service.model.PlaybackSession;
 import user.music_service.repository.PlaybackSessionRepository;
 import user.music_service.repository.SongRepository;
+import user.music_service.repository.SongRepository;
 import user.music_service.service.PlaybackService;
 import user.music_service.utils.DateTimeUtils;
 
@@ -33,6 +34,7 @@ import user.music_service.utils.DateTimeUtils;
 public class PlaybackServiceImpl implements PlaybackService {
     private final SecureRandom secureRandom = new SecureRandom();
     private final PlaybackSessionRepository playbackSessionRepository;
+    private final SongRepository songRepository;
     private final RequestHeaderData requestHeaderData;
     private final SongRepository songRepository;
 
