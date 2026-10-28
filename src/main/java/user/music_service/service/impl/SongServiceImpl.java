@@ -404,9 +404,13 @@ public class SongServiceImpl implements SongService {
                 ? null
                 : searchText.trim();
 
-        Page<Song> responsePage = songRepository.searchSongs(
-                normalizedSearch,
-                PageRequest.of(page, size));
+        PageRequest pageable = PageRequest.of(page, size);
+
+        // Do not pass null into a native query parameter. Use the standard
+        // paginated repository query when no search text was supplied.
+        Page<Song> responsePage = normalizedSearch == null
+                ? songRepository.findAll(pageable)
+                : songRepository.searchSongs(normalizedSearch, pageable);
 
         var pagination = GaneralPagination.<Song>builder()
                 .totalPage(responsePage.getTotalPages())
