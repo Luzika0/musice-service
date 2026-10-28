@@ -21,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -125,9 +124,9 @@ public class HlsProcessingService {
         Path masterPlaylist = outputDir.resolve("master.m3u8");
         Files.writeString(masterPlaylist,
                 "#EXTM3U\n"
-                + "#EXT-X-VERSION:3\n"
-                + "#EXT-X-STREAM-INF:BANDWIDTH=160000,CODECS=\"mp4a.40.2\"\n"
-                + "index.m3u8\n");
+                        + "#EXT-X-VERSION:3\n"
+                        + "#EXT-X-STREAM-INF:BANDWIDTH=160000,CODECS=\"mp4a.40.2\"\n"
+                        + "index.m3u8\n");
 
         putFile(prefix + "master.m3u8", masterPlaylist,
                 "application/vnd.apple.mpegurl");
@@ -177,7 +176,8 @@ public class HlsProcessingService {
 
         if (process.exitValue() != 0) {
             String details = Files.exists(ffmpegLog)
-                    ? Files.readString(ffmpegLog) : "No FFmpeg log available";
+                    ? Files.readString(ffmpegLog)
+                    : "No FFmpeg log available";
             throw new IOException("FFmpeg exited with code "
                     + process.exitValue() + ": " + details);
         }

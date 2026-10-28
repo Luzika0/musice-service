@@ -6,7 +6,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,7 +22,7 @@ public class AdminSongController {
     private final SongService songService;
 
     @PostMapping("/create-artist")
-    public ResponseEntity<?> createArtist(@RequestBody ArtistRequest req) {
+    public ResponseEntity<?> createArtist(@ModelAttribute ArtistRequest req) {
 
         return ResponseEntity.ok().body(songService.createArtist(req));
     }
@@ -32,6 +31,5 @@ public class AdminSongController {
     public ResponseEntity<?> uploadSong(@ModelAttribute SongRequest request) throws AppException, IOException {
         return ResponseEntity.ok().body(songService.uploadSongs(request));
     }
-    
 
 }

@@ -1,7 +1,6 @@
 package user.music_service.service.impl;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -45,7 +44,7 @@ import user.music_service.service.SongService;
 public class SongServiceImpl implements SongService {
 
     private static final long MAX_AUDIO_BYTES = 300L * 1024 * 1024;
-    private static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
+    private static final long MAX_IMAGE_BYTES = 20L * 1024 * 1024;
 
     private final GeneralResponse generalResponse;
     private final HlsService hlsService;
@@ -62,6 +61,11 @@ public class SongServiceImpl implements SongService {
     public GeneralResponse createArtist(ArtistRequest request) throws AppException {
         requireAdmin();
 
+        final var existArtist = artistRepository.findByArtistName(request.getArtistName());
+
+        if (existArtist != null) {
+            throw new AppException(ErrorCode.ARTIST_EXISTS, "Artist already exists");
+        }
         if (artistRepository.findByArtistName(request.getArtistName()) != null) {
             throw new AppException(ErrorCode.BAD_REQUEST,
                     Constant.THIS_ARTIST_WITH_NAME + request.getArtistName() + Constant.EXIST);
@@ -72,6 +76,7 @@ public class SongServiceImpl implements SongService {
 
         Artist artist = new Artist();
         artist.setArtistName(request.getArtistName());
+        artist.setStatus(Constant.STATUS_ACT);
         artist.setAlbumName(request.getAlbumName());
 
         // Save first because the database generates artistId for the R2 prefixes.

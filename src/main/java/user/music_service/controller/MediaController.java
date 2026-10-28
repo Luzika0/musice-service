@@ -33,23 +33,20 @@ public class MediaController {
     @Value("${cloudflare.r2.bucket}")
     private String bucket;
 
-    /**
-     * Streams original private cover images without making the R2 bucket public.
-     * Example: GET /media/image?key=music/songImage/{songId}.jpg
-     */
+    
     @GetMapping("/image")
-    public ResponseEntity<StreamingResponseBody> getImage(@RequestParam String key)
+    public ResponseEntity<StreamingResponseBody> getImage(@RequestParam String r2Imagekey)
             throws AppException {
         if (requestHeaderData.getUserId() == null) {
             throw new AppException(ErrorCode.UNAUTHURIZED, "User must be authenticated.");
         }
-        if (!isAllowedImageKey(key)) {
+        if (!isAllowedImageKey(r2Imagekey)) {
             throw new AppException(ErrorCode.NOT_FOUND, "Image not found.");
         }
 
         HeadObjectResponse metadata = s3Client.headObject(HeadObjectRequest.builder()
                 .bucket(bucket)
-                .key(key)
+                .key(r2Imagekey)
                 .build());
 
         String contentType = metadata.contentType();
@@ -59,7 +56,7 @@ public class MediaController {
 
         GetObjectRequest request = GetObjectRequest.builder()
                 .bucket(bucket)
-                .key(key)
+                .key(r2Imagekey)
                 .build();
 
         StreamingResponseBody body = output -> {
