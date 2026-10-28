@@ -4,7 +4,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.CacheControl;
-import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +28,19 @@ public class SongController {
     private final HlsService hlsService;
     private final RequestHeaderData requestHeaderData;
 
+    /**
+     * Preferred endpoint. POST makes the session-replacement side effect explicit.
+     */
+    @PostMapping("/playback-session")
+    public ResponseEntity<?> createPlaybackSession(@PathVariable UUID songId) throws AppException {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(playbackService.createSession(songId));
+    }
+
+    /**
+     * Legacy endpoint kept for existing clients. Migrate to POST /playback-session.
+     */
     @GetMapping("/playback-token")
     public ResponseEntity<?> getPlaybackToken(@PathVariable UUID songId) throws AppException {
         return ResponseEntity.ok()
@@ -42,7 +54,8 @@ public class SongController {
         String token = requestHeaderData.getPlayBackToken();
 
         if (userId == null || token == null || token.isBlank()) {
-            throw new AppException(ErrorCode.UNAUTHURIZED,
+            throw new AppException(
+                    ErrorCode.UNAUTHURIZED,
                     "Authenticated user and playback token are required.");
         }
 
