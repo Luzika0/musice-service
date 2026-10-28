@@ -1,5 +1,7 @@
 package user.music_service.dto.request;
 
+import org.springframework.web.multipart.MultipartFile;
+
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -11,5 +13,9 @@ public class ArtistRequest {
 
     @NotNull(message = "albumName is required")
     private String albumName;
+
+    private MultipartFile artistImage;
+
+    private MultipartFile albumIamge;
 
 }
