@@ -24,7 +24,17 @@ public class Song extends BaseEntity {
 
     private String songName;
 
+    /**
+     * R2 object key for the HLS master playlist, not the original audio.
+     */
+    @Column(name = "url_song")
     private String urlSong;
+
+    /**
+     * R2 object key for the original cover image.
+     */
+    @Column(name = "song_image")
+    private String songImage;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "song_type", nullable = false)
