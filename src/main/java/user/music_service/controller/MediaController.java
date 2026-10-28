@@ -82,6 +82,6 @@ public class MediaController {
                 && !key.contains("\\")
                 && (key.startsWith("music/songImage/")
                     || key.startsWith("music/artistImage/")
-                    || key.startsWith("music/albumImage/"));
+                    || key.startsWith("music/albumnImage/"));
     }
 }
