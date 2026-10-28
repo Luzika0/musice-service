@@ -25,8 +25,19 @@ public class RequestHeaderInterceptor implements HandlerInterceptor {
         String playBackTokenHeader = request.getHeader("playBack-token");
 
         if (userIdHeader != null && !userIdHeader.isBlank()) {
-            requestHeaderData.setUserId(Integer.valueOf(userIdHeader));
+            try {
+                int userId = Integer.parseInt(userIdHeader);
+                if (userId <= 0) {
+                    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    return false;
+                }
+                requestHeaderData.setUserId(userId);
+            } catch (NumberFormatException exception) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                return false;
+            }
         }
+
         if (playBackTokenHeader != null && !playBackTokenHeader.isBlank()) {
             requestHeaderData.setPlayBackToken(playBackTokenHeader);
         }
