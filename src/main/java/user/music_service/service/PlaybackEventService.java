@@ -13,17 +13,21 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
 public class PlaybackEventService {
 
     private static final long HEARTBEAT_INTERVAL_MILLIS = 15_000L;
 
     private final PlaybackService playbackService;
-    @Qualifier("playbackEventTaskScheduler")
     private final TaskScheduler playbackEventTaskScheduler;
+
+    public PlaybackEventService(
+            PlaybackService playbackService,
+            @Qualifier("playbackEventTaskScheduler") TaskScheduler playbackEventTaskScheduler) {
+        this.playbackService = playbackService;
+        this.playbackEventTaskScheduler = playbackEventTaskScheduler;
+    }
 
     public SseEmitter subscribe(UUID songId, Integer userId, String token) {
         SseEmitter emitter = new SseEmitter(0L);
@@ -63,7 +67,7 @@ public class PlaybackEventService {
                             .data(Map.of("active", true)));
                     lastHeartbeat.set(now);
                 }
-            } catch (IOException | IllegalStateException exception) {
+            } catch (IOException | RuntimeException exception) {
                 cancel.run();
                 emitter.completeWithError(exception);
             }
