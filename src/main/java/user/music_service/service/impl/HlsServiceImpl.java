@@ -1,5 +1,6 @@
 package user.music_service.service.impl;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -8,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import lombok.RequiredArgsConstructor;
@@ -37,7 +39,12 @@ public class HlsServiceImpl implements HlsService {
     private String bucket;
 
     @Override
-    public void processSong(UUID songId, String sourceObjectKey) throws java.io.IOException {
+    public void processSong(UUID songId, MultipartFile audioFile) throws IOException {
+        hlsProcessingService.processSong(songId, audioFile);
+    }
+
+    @Override
+    public void processSong(UUID songId, String sourceObjectKey) throws IOException {
         hlsProcessingService.processSong(songId, sourceObjectKey);
     }
 
