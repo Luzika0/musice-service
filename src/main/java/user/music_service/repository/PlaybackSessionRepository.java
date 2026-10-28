@@ -1,5 +1,6 @@
 package user.music_service.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,5 +14,5 @@ public interface PlaybackSessionRepository extends JpaRepository<PlaybackSession
 
     List<PlaybackSession> findAllByUserId(Long userId);
 
-    void deleteAllByUserId(long userId);
+    void deleteAllByUserIdAndExpiresAtBefore(Long userId, LocalDateTime expiresAt);
 }
