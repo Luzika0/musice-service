@@ -95,7 +95,8 @@ public class MediaController {
             @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String searchText) throws AppException {
-        return ResponseEntity.ok().body(songService.listSong(page, size, searchText));
+        return ResponseEntity.ok(
+                songService.listSong(page, size, searchText));
     }
 
 }
