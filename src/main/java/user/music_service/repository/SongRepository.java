@@ -16,10 +16,13 @@ public interface SongRepository extends JpaRepository<Song, UUID> {
             select s
             from songs s
             left join Artist a on a.artistId = s.artistId
-            where :searchText is null
-               or lower(s.songName) like lower(concat('%', :searchText, '%'))
-               or lower(a.artistName) like lower(concat('%', :searchText, '%'))
-               or lower(a.albumName) like lower(concat('%', :searchText, '%'))
+            where (
+                :searchText is null
+                or trim(:searchText) = ''
+                or lower(s.songName) like lower(concat('%', :searchText, '%'))
+                or lower(a.artistName) like lower(concat('%', :searchText, '%'))
+                or lower(a.albumName) like lower(concat('%', :searchText, '%'))
+            )
             """)
     Page<Song> searchSongs(
             @Param("searchText") String searchText,
