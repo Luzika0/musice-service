@@ -1,38 +1,38 @@
 spring:
-    application:
-        name: music-service
+  application:
+    name: music-service
 
-    datasource:
-            url: jdbc:postgresql://localhost:5432/music
-            username: postgres
-            password: mysecretpassword
-            driver-class-name: org.postgresql.Driver
-        
-    jpa:
-        hibernate:
-            show-sql: true
-            ddl-auto: update
-        properties:
-            hibernate:
-                dialect: org.hibernate.dialect.PostgreSQLDialect
-    servlet:
-        multipart:
-            max-file-size: 295MB
-            max-request-size: 300MB
-                
-    
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  servlet:
+    multipart:
+      max-file-size: 295MB
+      max-request-size: 300MB
+
 server:
-    port: 8081 
-    address: 127.0.0.1
+  port: ${PORT:8080}
 
 cloudflare:
-    r2:
-        account-id: ${CLOUD_FLARE_R2_ACC_ID}
-        bucket: music
-        access-key-id: ${ACCESS_KEY}
-        secret-access-key: ${SECRET_KEY}
+  r2:
+    account-id: ${CLOUD_FLARE_R2_ACC_ID}
+    bucket: ${R2_BUCKET:music}
+    access-key-id: ${ACCESS_KEY}
+    secret-access-key: ${SECRET_KEY}
+
 playback:
-    expiration: 300
+  expiration: ${PLAYBACK_EXPIRATION:300}
 
 hls:
-  ffmpeg-path: "${FFMPEG:C:/Users/ASUS/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg.Shared_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-9.0.2-full_build-shared/bin/ffmpeg.exe}"
+  ffmpeg-path: ${FFMPEG:ffmpeg}
