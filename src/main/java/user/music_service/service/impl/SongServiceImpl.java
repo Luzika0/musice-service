@@ -296,13 +296,15 @@ public class SongServiceImpl implements SongService {
 
     private void uploadImageAtKey(MultipartFile image, String key) throws IOException {
         String contentType = image.getContentType().toLowerCase();
-        s3Client.putObject(
-                PutObjectRequest.builder()
-                        .bucket(bucket)
-                        .key(key)
-                        .contentType(contentType)
-                        .build(),
-                RequestBody.fromInputStream(image.getInputStream(), image.getSize()));
+        try (var input = image.getInputStream()) {
+            s3Client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(bucket)
+                            .key(key)
+                            .contentType(contentType)
+                            .build(),
+                    RequestBody.fromInputStream(input, image.getSize()));
+        }
     }
 
     private String imageExtension(String contentType) {
