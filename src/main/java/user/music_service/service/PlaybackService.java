@@ -9,11 +9,9 @@ public interface PlaybackService {
 
     GeneralResponse createSession(UUID songId) throws AppException;
 
-    GeneralResponse validateToken(
-            String rawToken,
-            Integer userId,
-            UUID requestedSongId) throws AppException;
+    GeneralResponse validateToken(String rawToken, Integer userId, UUID requestedSongId) throws AppException;
 
-    GeneralResponse revokeSession(Integer userId, UUID seasionId) throws AppException;
+    boolean isSessionActive(String rawToken, Integer userId, UUID requestedSongId);
 
+    GeneralResponse revokeSession(Integer userId, UUID sessionId) throws AppException;
 }

@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import user.music_service.constant.Constant;
@@ -32,30 +34,42 @@ public class PlaybackServiceImpl implements PlaybackService {
     private final PlaybackSessionRepository playbackSessionRepository;
     private final RequestHeaderData requestHeaderData;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @Value("${playback.expiration}")
     private Long tokenLifeTimeSeacound;
 
     @Override
     @Transactional
     public GeneralResponse createSession(UUID songId) throws AppException {
-
         Integer userId = requestHeaderData.getUserId();
 
         if (userId == null) {
-            throw new AppException(
-                    ErrorCode.UNAUTHURIZED,
-                    "User must be authenticated.");
+            throw new AppException(ErrorCode.UNAUTHURIZED, "User must be authenticated.");
         }
 
-        playbackSessionRepository
-                .deleteAllByUserId(userId.longValue());
+        /*
+         * PostgreSQL transaction-scoped advisory lock: concurrent playback requests
+         * for this user are serialized even when Cloud Run serves them on different
+         * instances. The lock is automatically released when this transaction ends.
+         */
+        entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(CAST(:userId AS BIGINT))")
+                .setParameter("userId", userId.longValue())
+                .getSingleResult();
+
+        // Revoke instead of deleting: old tokens remain identifiable as revoked.
+        var previousSessions = playbackSessionRepository.findAllByUserId(userId.longValue());
+        for (PlaybackSession previous : previousSessions) {
+            if (!previous.isRevoked()) {
+                previous.setRevoked(true);
+            }
+        }
+        playbackSessionRepository.saveAll(previousSessions);
 
         byte[] bytes = new byte[32];
         secureRandom.nextBytes(bytes);
-
-        String rawToken = Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(bytes);
+        String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
 
         LocalDateTime expiresAt = DateTimeUtils.KHMER_LOCAL_DATE_TIME()
                 .plusSeconds(tokenLifeTimeSeacound);
@@ -63,7 +77,6 @@ public class PlaybackServiceImpl implements PlaybackService {
         PlaybackSession session = new PlaybackSession();
         session.setExpiresAt(expiresAt);
         session.setSongId(songId);
-
         session.setTokenHash(sha256(rawToken));
         session.setUserId(userId.longValue());
 
@@ -71,6 +84,7 @@ public class PlaybackServiceImpl implements PlaybackService {
 
         var data = new InnerPlaybackServiceTokenResponse(
                 rawToken,
+                savedSession.getId(),
                 savedSession.getExpiresAt(),
                 savedSession.getSongId());
 
@@ -79,6 +93,7 @@ public class PlaybackServiceImpl implements PlaybackService {
 
     private record InnerPlaybackServiceTokenResponse(
             String token,
+            UUID sessionId,
             @JsonFormat(pattern = "yyyy-MM-dd:HH:mm:ss", timezone = "UTC") LocalDateTime expiresAt,
             UUID songId) {
     }
@@ -89,8 +104,7 @@ public class PlaybackServiceImpl implements PlaybackService {
             Integer userId,
             UUID requestedSongId) throws AppException {
 
-        if (rawToken == null || rawToken.isBlank()
-                || userId == null || requestedSongId == null) {
+        if (rawToken == null || rawToken.isBlank() || userId == null || requestedSongId == null) {
             throw new AppException(
                     ErrorCode.BAD_REQUEST,
                     "Missing playback token, user, or song identity.");
@@ -103,32 +117,24 @@ public class PlaybackServiceImpl implements PlaybackService {
                         "Invalid playback token."));
 
         if (session.isRevoked()) {
-            throw new AppException(
-                    ErrorCode.REVOKED,
-                    "Playback token revoked.");
+            throw new AppException(ErrorCode.REVOKED, "Playback session was replaced by another device.");
         }
 
-        if (!DateTimeUtils.KHMER_LOCAL_DATE_TIME()
-                .isBefore(session.getExpiresAt())) {
-            throw new AppException(
-                    ErrorCode.EXPIRED,
-                    "Playback token expired.");
+        if (!DateTimeUtils.KHMER_LOCAL_DATE_TIME().isBefore(session.getExpiresAt())) {
+            throw new AppException(ErrorCode.EXPIRED, "Playback token expired.");
         }
 
         if (!session.getSongId().equals(requestedSongId)) {
-            throw new AppException(
-                    ErrorCode.INVALID_INPUT,
-                    "Playback token is not valid for this song.");
+            throw new AppException(ErrorCode.INVALID_INPUT, "Playback token is not valid for this song.");
         }
 
         if (!session.getUserId().equals(userId.longValue())) {
-            throw new AppException(
-                    ErrorCode.INVALID_INPUT,
-                    "Playback token does not belong to this user.");
+            throw new AppException(ErrorCode.INVALID_INPUT, "Playback token does not belong to this user.");
         }
 
         var data = new InnerPlaybackServiceTokenResponse(
                 null,
+                session.getId(),
                 session.getExpiresAt(),
                 session.getSongId());
 
@@ -136,26 +142,32 @@ public class PlaybackServiceImpl implements PlaybackService {
     }
 
     @Override
-    @Transactional
-    public GeneralResponse revokeSession(
-            Integer userId,
-            UUID sessionId) throws AppException {
+    public boolean isSessionActive(String rawToken, Integer userId, UUID requestedSongId) {
+        if (rawToken == null || rawToken.isBlank() || userId == null || requestedSongId == null) {
+            return false;
+        }
+        return playbackSessionRepository.findByTokenHash(sha256(rawToken))
+                .filter(session -> !session.isRevoked())
+                .filter(session -> DateTimeUtils.KHMER_LOCAL_DATE_TIME().isBefore(session.getExpiresAt()))
+                .filter(session -> session.getUserId().equals(userId.longValue()))
+                .filter(session -> session.getSongId().equals(requestedSongId))
+                .isPresent();
+    }
 
+    @Override
+    @Transactional
+    public GeneralResponse revokeSession(Integer userId, UUID sessionId) throws AppException {
         var session = playbackSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new AppException(
                         ErrorCode.NOT_FOUND,
                         "Playback session" + Constant.NOT_FOUND));
 
-        if (!session.getUserId().equals(userId.longValue())) {
-            throw new AppException(
-                    ErrorCode.BAD_REQUEST,
-                    "Not your session.");
+        if (userId == null || !session.getUserId().equals(userId.longValue())) {
+            throw new AppException(ErrorCode.BAD_REQUEST, "Not your session.");
         }
 
         session.setRevoked(true);
-
         playbackSessionRepository.save(session);
-
         return new GeneralResponse();
     }
 
@@ -163,12 +175,9 @@ public class PlaybackServiceImpl implements PlaybackService {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")
                     .digest(value.getBytes(StandardCharsets.UTF_8));
-
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
-            throw new IllegalStateException(
-                    "SHA-256 is unavailable", e);
+            throw new IllegalStateException("SHA-256 is unavailable", e);
         }
     }
-
 }

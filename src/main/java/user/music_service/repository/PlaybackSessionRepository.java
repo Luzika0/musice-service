@@ -1,5 +1,6 @@
 package user.music_service.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -10,8 +11,7 @@ import user.music_service.model.PlaybackSession;
 public interface PlaybackSessionRepository extends JpaRepository<PlaybackSession, UUID> {
     Optional<PlaybackSession> findByTokenHash(String tokenHash);
 
-    Optional<PlaybackSession> findByUserId(Integer userId);
+    List<PlaybackSession> findAllByUserId(Long userId);
 
     void deleteAllByUserId(long userId);
-    
 }
