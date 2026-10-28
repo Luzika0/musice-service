@@ -2,7 +2,9 @@ package user.music_service.controller;
 
 import java.util.UUID;
 
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,7 +26,7 @@ public class PlaybackEventController {
     private final RequestHeaderData requestHeaderData;
 
     @GetMapping(value = "/playback-events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe(@PathVariable UUID songId) throws AppException {
+    public ResponseEntity<SseEmitter> subscribe(@PathVariable UUID songId) throws AppException {
         Integer userId = requestHeaderData.getUserId();
         String token = requestHeaderData.getPlayBackToken();
 
@@ -34,6 +36,10 @@ public class PlaybackEventController {
                     "Authenticated user and playback token are required.");
         }
 
-        return playbackEventService.subscribe(songId, userId, token);
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_EVENT_STREAM)
+                .cacheControl(CacheControl.noStore())
+                .header("X-Accel-Buffering", "no")
+                .body(playbackEventService.subscribe(songId, userId, token));
     }
 }
