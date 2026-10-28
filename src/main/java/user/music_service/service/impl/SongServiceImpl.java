@@ -85,7 +85,7 @@ public class SongServiceImpl implements SongService {
             if (hasFile(request.getAlbumIamge())) {
                 saved.setAlbumImage(uploadImage(
                         request.getAlbumIamge(),
-                        "music/albumImage/" + saved.getArtistId()));
+                        "music/albumnImage/" + saved.getArtistId()));
             }
             saved = artistRepository.save(saved);
             return new GeneralResponse(toArtistResponse(saved));
@@ -120,7 +120,7 @@ public class SongServiceImpl implements SongService {
             }
             if (hasFile(request.getAlbumIamge())) {
                 artist.setAlbumImage(uploadImage(
-                        request.getAlbumIamge(), "music/albumImage/" + artist.getArtistId()));
+                        request.getAlbumIamge(), "music/albumnImage/" + artist.getArtistId()));
             }
             artist.setAlbumName(request.getAlbumName());
             Artist saved = artistRepository.save(artist);
