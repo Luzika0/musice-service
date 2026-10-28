@@ -196,6 +196,9 @@ public class SongServiceImpl implements SongService {
             throw new AppException(ErrorCode.BAD_REQUEST, "Song cover must be an image.");
         }
 
+        // Validate the image format before creating any HLS objects.
+        String imageExtension = getImageExtension(imageContentType);
+
         UUID uuid = UUID.randomUUID();
 
         // Convert audio from local temporary storage. Original audio is never uploaded to R2.
@@ -209,7 +212,6 @@ public class SongServiceImpl implements SongService {
         }
 
         // Store the original image bytes in private R2 as a separate object.
-        String imageExtension = getImageExtension(imageContentType);
         String imageObjectKey = "song-images/" + uuid + imageExtension;
 
         s3Client.putObject(
