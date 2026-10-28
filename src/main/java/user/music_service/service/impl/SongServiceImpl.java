@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.EncryptionTypeMismatchException;
 import software.amazon.awssdk.services.s3.model.InvalidRequestException;
 import software.amazon.awssdk.services.s3.model.InvalidWriteOffsetException;
@@ -42,10 +44,11 @@ import user.music_service.service.SongService;
 @Slf4j
 public class SongServiceImpl implements SongService {
 
+    private static final long MAX_AUDIO_BYTES = 300L * 1024 * 1024;
+    private static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
+
     private final GeneralResponse generalResponse;
-
     private final HlsService hlsService;
-
     private final UserRepository userRepository;
     private final RequestHeaderData requestHeaderData;
     private final ArtistRepository artistRepository;
@@ -57,86 +60,114 @@ public class SongServiceImpl implements SongService {
 
     @Override
     public GeneralResponse createArtist(ArtistRequest request) throws AppException {
+        requireAdmin();
 
-        var existArtistEntity = artistRepository.findByArtistName(request.getArtistName());
-        Integer userId = requestHeaderData.getUserId();
-        var permission = userRepository
-                .findById(userId);
-
-        if (permission.isEmpty()) {
-            throw new AppException(
-                    ErrorCode.BAD_REQUEST,
-                    Constant.NOT_FOUND);
+        if (artistRepository.findByArtistName(request.getArtistName()) != null) {
+            throw new AppException(ErrorCode.BAD_REQUEST,
+                    Constant.THIS_ARTIST_WITH_NAME + request.getArtistName() + Constant.EXIST);
         }
 
-        if (permission.get().getPermission() == null
-                || !List.of(
-                        Constant.PERMISSION_ADMIN).contains(permission.get().getPermission().getPermission())) {
+        validateOptionalImage(request.getArtistImage(), "Artist image");
+        validateOptionalImage(request.getAlbumIamge(), "Album image");
 
-            throw new AppException(
-                    ErrorCode.ACCESS_DENIED,
-                    Constant.NOT_ENOUGH_PERMISSION_PERMISSION);
+        Artist artist = new Artist();
+        artist.setArtistName(request.getArtistName());
+        artist.setAlbumName(request.getAlbumName());
+
+        // Save first because the database generates artistId for the R2 prefixes.
+        Artist saved = artistRepository.save(artist);
+        try {
+            if (hasFile(request.getArtistImage())) {
+                saved.setArtistImage(uploadImage(
+                        request.getArtistImage(),
+                        "music/artistImage/" + saved.getArtistId()));
+            }
+            if (hasFile(request.getAlbumIamge())) {
+                saved.setAlbumImage(uploadImage(
+                        request.getAlbumIamge(),
+                        "music/albumImage/" + saved.getArtistId()));
+            }
+            saved = artistRepository.save(saved);
+            return new GeneralResponse(toArtistResponse(saved));
+        } catch (RuntimeException | IOException exception) {
+            log.error("Failed to store artist images for artistId={}", saved.getArtistId(), exception);
+            deleteIfPresent(saved.getArtistImage());
+            deleteIfPresent(saved.getAlbumImage());
+            artistRepository.delete(saved);
+            throw new AppException(ErrorCode.BAD_REQUEST,
+                    "Could not store artist or album image. No artist was created.");
         }
-        if (existArtistEntity != null) {
-            throw new AppException(
-                    ErrorCode.BAD_REQUEST,
-                    Constant.THIS_ARTIST_WITH_NAME
-                            + request.getArtistName()
-                            + Constant.EXIST);
-        }
-
-        Artist newArtist = new Artist();
-        newArtist.setArtistName(request.getArtistName());
-        newArtist.setAlbumName(request.getAlbumName());
-
-        Artist savedArtist = artistRepository.save(newArtist);
-
-        return new GeneralResponse(savedArtist);
     }
 
     @Override
     public GeneralResponse updateArtist(ArtistRequest request) throws AppException {
-        final var artistEntity = artistRepository.findByArtistName(request.getArtistName());
-
-        if (artistEntity == null) {
+        requireAdmin();
+        Artist artist = artistRepository.findByArtistName(request.getArtistName());
+        if (artist == null) {
             throw new AppException(ErrorCode.ARTIST_EXISTS,
                     Constant.THIS_ARTIST_WITH_NAME + request.getArtistName() + Constant.NOT_FOUND);
         }
-        artistEntity.setArtistName(request.getArtistName());
-        artistEntity.setAlbumName(request.getAlbumName());
-        artistRepository.save(artistEntity);
-        return generalResponse;
+
+        validateOptionalImage(request.getArtistImage(), "Artist image");
+        validateOptionalImage(request.getAlbumIamge(), "Album image");
+
+        String oldArtistImage = artist.getArtistImage();
+        String oldAlbumImage = artist.getAlbumImage();
+        try {
+            if (hasFile(request.getArtistImage())) {
+                artist.setArtistImage(uploadImage(
+                        request.getArtistImage(), "music/artistImage/" + artist.getArtistId()));
+            }
+            if (hasFile(request.getAlbumIamge())) {
+                artist.setAlbumImage(uploadImage(
+                        request.getAlbumIamge(), "music/albumImage/" + artist.getArtistId()));
+            }
+            artist.setAlbumName(request.getAlbumName());
+            Artist saved = artistRepository.save(artist);
+
+            if (hasFile(request.getArtistImage())) {
+                deleteIfPresent(oldArtistImage);
+            }
+            if (hasFile(request.getAlbumIamge())) {
+                deleteIfPresent(oldAlbumImage);
+            }
+            return new GeneralResponse(toArtistResponse(saved));
+        } catch (IOException | RuntimeException exception) {
+            log.error("Failed to update artist {}", artist.getArtistId(), exception);
+            // Restore old object references if persistence/update fails.
+            artist.setArtistImage(oldArtistImage);
+            artist.setAlbumImage(oldAlbumImage);
+            throw new AppException(ErrorCode.BAD_REQUEST,
+                    "Could not update artist images. Please retry.");
+        }
     }
 
     @Override
-    public GeneralResponse viewArtist(Integer page, Integer size, String searchText) throws AppException {
-        final var pageable = PageRequest.of(page, size);
-        final var responsePage = artistRepository.findAllOrByArtistNameContainingIgnoreCase(searchText, pageable);
+    public GeneralResponse viewArtist(Integer page, Integer size, String searchText)
+            throws AppException {
+        if (page == null || page < 0 || size == null || size < 1 || size > 100) {
+            throw new AppException(ErrorCode.BAD_REQUEST,
+                    "Page must be >= 0 and size must be between 1 and 100.");
+        }
+        final var responsePage = artistRepository.findAllOrByArtistNameContainingIgnoreCase(
+                searchText, PageRequest.of(page, size));
 
-        final var data = responsePage.stream()
-                .map(t -> {
-                    final var artistResponse = new ArtistResponse();
-                    artistResponse.setArtistId(t.getArtistId());
-                    artistResponse.setArtistName(t.getArtistName());
-                    artistResponse.setAlbumName(t.getAlbumName());
-
-                    return artistResponse;
-                });
-        final var pagination = GaneralPagination.builder().totalPage(responsePage.getTotalPages())
-                .totalElement(responsePage.getTotalElements()).data(data).build();
-
+        final var data = responsePage.stream().map(this::toArtistResponse).toList();
+        final var pagination = GaneralPagination.builder()
+                .totalPage(responsePage.getTotalPages())
+                .totalElement(responsePage.getTotalElements())
+                .data(data)
+                .build();
         return new GeneralResponse(pagination);
     }
 
     @Override
     public GeneralResponse deleteArtist(Integer artistId) throws AppException {
-
+        requireAdmin();
         final var artist = artistRepository.findById(artistId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND,
                         Constant.THIS_ARTIST_WITH_NAME + artistId + Constant.NOT_FOUND));
-
         artist.setStatus(Constant.STATUS_DEL);
-
         artistRepository.save(artist);
         return generalResponse;
     }
@@ -148,114 +179,155 @@ public class SongServiceImpl implements SongService {
             EncryptionTypeMismatchException, S3Exception,
             AwsServiceException, SdkClientException, IOException {
 
-        Integer userId = requestHeaderData.getUserId();
-
-        var permission = userRepository.findById(userId);
-
-        if (permission.isEmpty()) {
-            throw new AppException(
-                    ErrorCode.BAD_REQUEST,
-                    Constant.NOT_FOUND);
-        }
-
-        if (permission.get().getPermission() == null
-                || !List.of(Constant.PERMISSION_ADMIN)
-                        .contains(permission.get().getPermission().getPermission())) {
-
-            throw new AppException(
-                    ErrorCode.ACCESS_DENIED,
-                    Constant.NOT_ENOUGH_PERMISSION_PERMISSION);
-        }
+        requireAdmin();
 
         if (request.getArtistId() == null
                 || artistRepository.findById(request.getArtistId()).isEmpty()) {
-
-            throw new AppException(
-                    ErrorCode.NOT_FOUND,
-                    Constant.THIS_ARTIST_WITH_ID
-                            + request.getArtistId()
-                            + Constant.NOT_FOUND);
+            throw new AppException(ErrorCode.NOT_FOUND,
+                    Constant.THIS_ARTIST_WITH_ID + request.getArtistId() + Constant.NOT_FOUND);
         }
 
-        var file = request.getFile();
-
-        if (file == null || file.isEmpty()) {
-            throw new AppException(
-                    ErrorCode.BAD_REQUEST,
-                    Constant.REQUEST_FILE);
+        MultipartFile audio = request.getFile();
+        if (audio == null || audio.isEmpty()) {
+            throw new AppException(ErrorCode.BAD_REQUEST, "Audio file is required.");
+        }
+        if (audio.getSize() > MAX_AUDIO_BYTES) {
+            throw new AppException(ErrorCode.FILE_SIZE_LIMIT_EXCEEDED,
+                    "Audio file must not exceed 300 MB.");
+        }
+        if (audio.getContentType() == null || !audio.getContentType().toLowerCase().startsWith("audio/")) {
+            throw new AppException(ErrorCode.BAD_REQUEST, "Only audio files are allowed.");
         }
 
-        if (file.getSize() > 300L * 1024 * 1024) {
-            throw new AppException(
-                    ErrorCode.FILE_SIZE_LIMIT_EXCEEDED,
-                    Constant.FILE_SIZE_LIMIT_EXCEEDED);
+        MultipartFile image = request.getSongImage();
+        validateRequiredImage(image, "Song cover image");
+        String imageExtension = imageExtension(image.getContentType());
+
+        UUID songId = UUID.randomUUID();
+        String imageKey = "music/songImage/" + songId + imageExtension;
+
+        // The original audio stays on local temporary storage only. HLS service
+        // uploads encrypted HLS output to music/hls/{songId}/.
+        try {
+            hlsService.processSong(songId, audio);
+        } catch (IOException | RuntimeException exception) {
+            log.error("Local audio processing/HLS upload failed for songId={}", songId, exception);
+            throw new AppException(ErrorCode.BAD_REQUEST,
+                    "HLS processing failed. Check server logs and try again.");
         }
-
-        String contentType = file.getContentType();
-
-        if (contentType == null || !contentType.startsWith("audio/")) {
-            throw new AppException(
-                    ErrorCode.BAD_REQUEST,
-                    "Only audio files are allowed");
-        }
-
-        UUID uuid = UUID.randomUUID();
-        String objectKey = "songs/" + uuid;
-
-        
-        PutObjectRequest putRequest = PutObjectRequest.builder()
-                .bucket(bucket)
-                .key(objectKey)
-                .contentType(contentType)
-                .build();
-
-        s3Client.putObject(
-                putRequest,
-                RequestBody.fromInputStream(
-                        file.getInputStream(),
-                        file.getSize()));
-
-        log.info(
-                "Original audio uploaded to R2. songId={}, objectKey={}",
-                uuid,
-                objectKey);
-
 
         try {
-            hlsService.processSong(uuid, objectKey);
+            uploadImageAtKey(image, imageKey);
+            Song song = new Song();
+            song.setSongId(songId);
+            song.setArtistId(request.getArtistId());
+            song.setSongName(request.getSongName());
+            song.setSongType(request.getSongType());
+            song.setUrlSong("music/hls/" + songId + "/master.m3u8");
+            song.setSongImage(imageKey);
+            songRepository.save(song);
+            log.info("Song saved. songId={}, hlsKey={}, imageKey={}",
+                    songId, song.getUrlSong(), imageKey);
+            return new GeneralResponse(song);
         } catch (IOException | RuntimeException exception) {
-            log.error("HLS processing failed. songId={}", uuid, exception);
-
-            throw new AppException(
-                    ErrorCode.BAD_REQUEST,
-                    "HLS processing failed. Please try uploading again.");
-        } finally {
-            try {
-                s3Client.deleteObject(builder -> builder
-                        .bucket(bucket)
-                        .key(objectKey));
-                log.info("Temporary original audio deleted. songId={}", uuid);
-            } catch (RuntimeException cleanupException) {
-                log.error(
-                        "Failed to delete temporary original audio. songId={}, key={}",
-                        uuid,
-                        objectKey,
-                        cleanupException);
-            }
+            deleteIfPresent(imageKey);
+            log.error("Failed to save song metadata/image for songId={}", songId, exception);
+            throw new AppException(ErrorCode.BAD_REQUEST,
+                    "Song metadata or cover image could not be saved.");
         }
-
-        Song songEntity = new Song();
-        songEntity.setSongId(uuid);
-        songEntity.setArtistId(request.getArtistId());
-        songEntity.setSongName(request.getSongName());
-        songEntity.setSongType(request.getSongType());
-        songEntity.setUrlSong(objectKey);
-
-        songRepository.save(songEntity);
-
-        log.info("Song uploaded and HLS generated successfully: {}", uuid);
-
-        return new GeneralResponse();
     }
 
+    private void requireAdmin() {
+        Integer userId = requestHeaderData.getUserId();
+        if (userId == null) {
+            throw new AppException(ErrorCode.UNAUTHURIZED, "User must be authenticated.");
+        }
+        var user = userRepository.findById(userId);
+        if (user.isEmpty()) {
+            throw new AppException(ErrorCode.BAD_REQUEST, Constant.NOT_FOUND);
+        }
+        if (user.get().getPermission() == null
+                || !Constant.PERMISSION_ADMIN.equals(user.get().getPermission().getPermission())) {
+            throw new AppException(ErrorCode.ACCESS_DENIED,
+                    Constant.NOT_ENOUGH_PERMISSION_PERMISSION);
+        }
+    }
+
+    private ArtistResponse toArtistResponse(Artist artist) {
+        ArtistResponse response = new ArtistResponse();
+        response.setArtistId(artist.getArtistId());
+        response.setArtistName(artist.getArtistName());
+        response.setAlbumName(artist.getAlbumName());
+        response.setArtistImage(artist.getArtistImage());
+        response.setAlbumImage(artist.getAlbumImage());
+        return response;
+    }
+
+    private boolean hasFile(MultipartFile file) {
+        return file != null && !file.isEmpty();
+    }
+
+    private void validateOptionalImage(MultipartFile file, String label) {
+        if (hasFile(file)) {
+            validateRequiredImage(file, label);
+            imageExtension(file.getContentType());
+        }
+    }
+
+    private void validateRequiredImage(MultipartFile file, String label) {
+        if (file == null || file.isEmpty()) {
+            throw new AppException(ErrorCode.BAD_REQUEST, label + " is required.");
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            throw new AppException(ErrorCode.FILE_SIZE_LIMIT_EXCEEDED,
+                    label + " must not exceed 10 MB.");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
+            throw new AppException(ErrorCode.BAD_REQUEST, label + " must be an image.");
+        }
+    }
+
+    private String uploadImage(MultipartFile image, String prefix) throws IOException {
+        String key = prefix + "/" + UUID.randomUUID() + imageExtension(image.getContentType());
+        uploadImageAtKey(image, key);
+        return key;
+    }
+
+    private void uploadImageAtKey(MultipartFile image, String key) throws IOException {
+        String contentType = image.getContentType().toLowerCase();
+        s3Client.putObject(
+                PutObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .contentType(contentType)
+                        .build(),
+                RequestBody.fromInputStream(image.getInputStream(), image.getSize()));
+    }
+
+    private String imageExtension(String contentType) {
+        if (contentType == null) {
+            throw new AppException(ErrorCode.BAD_REQUEST, "Image content type is required.");
+        }
+        return switch (contentType.toLowerCase()) {
+            case "image/jpeg", "image/jpg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "image/gif" -> ".gif";
+            case "image/avif" -> ".avif";
+            default -> throw new AppException(ErrorCode.BAD_REQUEST,
+                    "Supported image formats: JPEG, PNG, WebP, GIF, AVIF.");
+        };
+    }
+
+    private void deleteIfPresent(String key) {
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+        } catch (RuntimeException exception) {
+            log.warn("Could not clean up R2 object {}", key, exception);
+        }
+    }
 }
