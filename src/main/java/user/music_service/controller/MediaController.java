@@ -90,5 +90,10 @@ public class MediaController {
                         || key.startsWith("music/albumnImage/"));
     }
 
-    
+    @GetMapping("/list-song")
+    public ResponseEntity<?> listSongs(@RequestParam Integer page, @RequestParam Integer size,
+            @RequestParam String searchText) throws AppException {
+        return ResponseEntity.ok().body(songService.listSong(page, size, searchText));
+    }
+
 }

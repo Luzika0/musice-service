@@ -356,9 +356,7 @@ public class SongServiceImpl implements SongService {
                         ErrorCode.NOT_FOUND,
                         Constant.THIS_SONG_WITH_ID + songId + Constant.NOT_FOUND));
 
-        // R2 stores HLS assets under one prefix per song, plus a separate cover image.
-        // Remove storage objects before removing the database record so a storage
-        // failure does not silently leave a song that can no longer be played.
+        
         deleteR2Prefix("music/hls/" + songId + "/");
         deleteIfPresent(song.getSongImage());
         songRepository.delete(song);
