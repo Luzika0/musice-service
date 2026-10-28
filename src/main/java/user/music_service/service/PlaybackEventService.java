@@ -8,6 +8,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -21,6 +22,7 @@ public class PlaybackEventService {
     private static final long HEARTBEAT_INTERVAL_MILLIS = 15_000L;
 
     private final PlaybackService playbackService;
+    @Qualifier("playbackEventTaskScheduler")
     private final TaskScheduler playbackEventTaskScheduler;
 
     public SseEmitter subscribe(UUID songId, Integer userId, String token) {
