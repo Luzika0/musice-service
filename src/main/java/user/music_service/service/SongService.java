@@ -23,7 +23,7 @@ public interface SongService {
 
     GeneralResponse deleteArtist(Integer artistId) throws AppException;
 
-    GeneralResponse deleteSong(Integer songId)
+    GeneralResponse deleteSong(java.util.UUID songId)
             throws AppException, InvalidRequestException, InvalidWriteOffsetException, TooManyPartsException,
             EncryptionTypeMismatchException, S3Exception, AwsServiceException, SdkClientException, IOException;
 
