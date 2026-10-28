@@ -78,5 +78,15 @@
     "name": "cloudflare.r2.account-id",
     "type": "java.lang.String",
     "description": "A description for 'cloudflare.r2.account-id'"
+  },
+  {
+    "name": "hls.ffmpeg-path",
+    "type": "java.lang.String",
+    "description": "A description for 'hls.ffmpeg-path'"
+  },
+  {
+    "name": "hls.ffmpeg-path",
+    "type": "java.lang.String",
+    "description": "A description for 'hls.ffmpeg-path'"
   }
 ]}

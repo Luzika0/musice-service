@@ -1,10 +1,6 @@
 package user.music_service.service;
 
 import java.io.IOException;
-import java.util.UUID;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.SdkClientException;
@@ -27,8 +23,8 @@ public interface SongService {
 
     GeneralResponse deleteArtist(Integer artistId) throws AppException;
 
-    GeneralResponse uploadSongs(SongRequest request) throws AppException, InvalidRequestException, InvalidWriteOffsetException, TooManyPartsException, EncryptionTypeMismatchException, S3Exception, AwsServiceException, SdkClientException, IOException;
-
-    ResponseEntity<StreamingResponseBody> streamSong(UUID songId) throws AppException;
+    GeneralResponse uploadSongs(SongRequest request)
+            throws AppException, InvalidRequestException, InvalidWriteOffsetException, TooManyPartsException,
+            EncryptionTypeMismatchException, S3Exception, AwsServiceException, SdkClientException, IOException;
 
 }

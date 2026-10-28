@@ -5,13 +5,12 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 
 @Table(name = "permission")
 @Entity
 @Data
-@EqualsAndHashCode(callSuper = false)
-public class Permission extends BaseEntity {
+
+public class Permission {
     @Id
     @Column(name = "permission_id")
     private Integer permissionId;

@@ -6,21 +6,15 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
-import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.EncryptionTypeMismatchException;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.InvalidRequestException;
 import software.amazon.awssdk.services.s3.model.InvalidWriteOffsetException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -40,16 +34,15 @@ import user.music_service.model.Song;
 import user.music_service.repository.ArtistRepository;
 import user.music_service.repository.SongRepository;
 import user.music_service.repository.UserRepository;
-import user.music_service.service.PlaybackService;
+import user.music_service.service.HlsService;
 import user.music_service.service.SongService;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SongServiceImpl implements SongService {
 
     private final GeneralResponse generalResponse;
-
-    private final PlaybackService playbackService;
 
     private final HlsService hlsService;
 
@@ -150,11 +143,14 @@ public class SongServiceImpl implements SongService {
 
     @Override
     public GeneralResponse uploadSongs(SongRequest request)
-            throws AppException, InvalidRequestException, InvalidWriteOffsetException, TooManyPartsException, EncryptionTypeMismatchException, S3Exception, AwsServiceException, SdkClientException, IOException {
+            throws AppException, InvalidRequestException,
+            InvalidWriteOffsetException, TooManyPartsException,
+            EncryptionTypeMismatchException, S3Exception,
+            AwsServiceException, SdkClientException, IOException {
 
         Integer userId = requestHeaderData.getUserId();
-        var permission = userRepository
-                .findById(userId);
+
+        var permission = userRepository.findById(userId);
 
         if (permission.isEmpty()) {
             throw new AppException(
@@ -163,8 +159,8 @@ public class SongServiceImpl implements SongService {
         }
 
         if (permission.get().getPermission() == null
-                || !List.of(
-                        Constant.PERMISSION_ADMIN).contains(permission.get().getPermission().getPermission())) {
+                || !List.of(Constant.PERMISSION_ADMIN)
+                        .contains(permission.get().getPermission().getPermission())) {
 
             throw new AppException(
                     ErrorCode.ACCESS_DENIED,
@@ -173,8 +169,12 @@ public class SongServiceImpl implements SongService {
 
         if (request.getArtistId() == null
                 || artistRepository.findById(request.getArtistId()).isEmpty()) {
-            throw new AppException(ErrorCode.NOT_FOUND,
-                    Constant.THIS_ARTIST_WITH_ID + request.getArtistId() + Constant.NOT_FOUND);
+
+            throw new AppException(
+                    ErrorCode.NOT_FOUND,
+                    Constant.THIS_ARTIST_WITH_ID
+                            + request.getArtistId()
+                            + Constant.NOT_FOUND);
         }
 
         var file = request.getFile();
@@ -202,6 +202,7 @@ public class SongServiceImpl implements SongService {
         UUID uuid = UUID.randomUUID();
         String objectKey = "songs/" + uuid;
 
+        
         PutObjectRequest putRequest = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(objectKey)
@@ -214,18 +215,33 @@ public class SongServiceImpl implements SongService {
                         file.getInputStream(),
                         file.getSize()));
 
+        log.info(
+                "Original audio uploaded to R2. songId={}, objectKey={}",
+                uuid,
+                objectKey);
+
+
         try {
             hlsService.processSong(uuid, objectKey);
         } catch (IOException | RuntimeException exception) {
-            // Do not create a playable song record when HLS generation fails.
-            try {
-                s3Client.deleteObject(builder -> builder.bucket(bucket).key(objectKey));
-            } catch (RuntimeException cleanupException) {
-                exception.addSuppressed(cleanupException);
-            }
+            log.error("HLS processing failed. songId={}", uuid, exception);
+
             throw new AppException(
                     ErrorCode.BAD_REQUEST,
-                    "HLS processing failed. Check that FFmpeg is installed and configured.");
+                    "HLS processing failed. Please try uploading again.");
+        } finally {
+            try {
+                s3Client.deleteObject(builder -> builder
+                        .bucket(bucket)
+                        .key(objectKey));
+                log.info("Temporary original audio deleted. songId={}", uuid);
+            } catch (RuntimeException cleanupException) {
+                log.error(
+                        "Failed to delete temporary original audio. songId={}, key={}",
+                        uuid,
+                        objectKey,
+                        cleanupException);
+            }
         }
 
         Song songEntity = new Song();
@@ -237,73 +253,9 @@ public class SongServiceImpl implements SongService {
 
         songRepository.save(songEntity);
 
+        log.info("Song uploaded and HLS generated successfully: {}", uuid);
+
         return new GeneralResponse();
-    }
-
-    @Override
-    public ResponseEntity<StreamingResponseBody> streamSong(
-            UUID songId) throws AppException {
-
-        Integer userId = requestHeaderData.getUserId();
-        String playbackToken = requestHeaderData.getPlayBackToken();
-
-        if (userId == null) {
-            throw new AppException(
-                    ErrorCode.ACCESS_DENIED,
-                    Constant.NOT_ENOUGH_PERMISSION_PERMISSION);
-        }
-
-        var user = userRepository.findById(userId);
-
-        if (user.isEmpty()) {
-            throw new AppException(
-                    ErrorCode.BAD_REQUEST,
-                    Constant.NOT_FOUND);
-        }
-
-        var permission = user.get().getPermission();
-
-        if (permission == null
-                || !List.of(
-                        Constant.PERMISSION_ADMIN,
-                        Constant.PERMISSION_USER).contains(permission.getPermission())) {
-
-            throw new AppException(
-                    ErrorCode.ACCESS_DENIED,
-                    Constant.NOT_ENOUGH_PERMISSION_PERMISSION);
-        }
-
-        var song = songRepository.findById(songId);
-
-        if (song.isEmpty()) {
-            throw new AppException(
-                    ErrorCode.NOT_FOUND,
-                    Constant.THIS_SONG_WITH_ID
-                            + songId
-                            + Constant.NOT_FOUND);
-        }
-
-        playbackService.validateToken(
-                playbackToken,
-                userId,
-                songId);
-
-        GetObjectRequest request = GetObjectRequest.builder()
-                .bucket(bucket)
-                .key(song.get().getUrlSong())
-                .build();
-
-        StreamingResponseBody stream = outputStream -> {
-            try (ResponseInputStream<GetObjectResponse> inputStream = s3Client.getObject(request)) {
-                inputStream.transferTo(outputStream);
-                outputStream.flush();
-            }
-        };
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("audio/mpeg"))
-                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                .body(stream);
     }
 
 }

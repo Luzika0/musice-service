@@ -1,5 +1,7 @@
 package user.music_service.dto.request;
 
+
+
 import org.springframework.web.multipart.MultipartFile;
 
 import lombok.Data;
@@ -11,6 +13,8 @@ public class SongRequest {
     private Integer artistId;
 
     private String songName;
+
+    private MultipartFile songImage;
 
     private SongType songType;
 
