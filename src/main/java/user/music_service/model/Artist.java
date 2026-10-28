@@ -1,5 +1,6 @@
 package user.music_service.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -22,6 +23,13 @@ public class Artist extends BaseEntity {
 
     private String albumName;
 
-    private String status;
+    /** Private R2 object key, e.g. music/artistImage/12/cover.jpg. */
+    @Column(name = "artist_image")
+    private String artistImage;
 
+    /** Private R2 object key, e.g. music/albumnImage/12/cover.jpg. */
+    @Column(name = "album_image")
+    private String albumImage;
+
+    private String status;
 }
