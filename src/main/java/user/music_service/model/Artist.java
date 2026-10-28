@@ -27,7 +27,7 @@ public class Artist extends BaseEntity {
     @Column(name = "artist_image")
     private String artistImage;
 
-    /** Private R2 object key, e.g. music/albumImage/12/cover.jpg. */
+    /** Private R2 object key, e.g. music/albumnImage/12/cover.jpg. */
     @Column(name = "album_image")
     private String albumImage;
 
