@@ -142,6 +142,19 @@ public class PlaybackServiceImpl implements PlaybackService {
     }
 
     @Override
+    public boolean isSessionActive(String rawToken, Integer userId, UUID requestedSongId) {
+        if (rawToken == null || rawToken.isBlank() || userId == null || requestedSongId == null) {
+            return false;
+        }
+        return playbackSessionRepository.findByTokenHash(sha256(rawToken))
+                .filter(session -> !session.isRevoked())
+                .filter(session -> DateTimeUtils.KHMER_LOCAL_DATE_TIME().isBefore(session.getExpiresAt()))
+                .filter(session -> session.getUserId().equals(userId.longValue()))
+                .filter(session -> session.getSongId().equals(requestedSongId))
+                .isPresent();
+    }
+
+    @Override
     @Transactional
     public GeneralResponse revokeSession(Integer userId, UUID sessionId) throws AppException {
         var session = playbackSessionRepository.findById(sessionId)
