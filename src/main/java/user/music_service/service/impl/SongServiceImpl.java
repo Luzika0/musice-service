@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,7 +15,10 @@ import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.EncryptionTypeMismatchException;
 import software.amazon.awssdk.services.s3.model.InvalidRequestException;
 import software.amazon.awssdk.services.s3.model.InvalidWriteOffsetException;
@@ -338,17 +342,80 @@ public class SongServiceImpl implements SongService {
     }
 
     @Override
-    public GeneralResponse deleteSong(Integer songId)
+    public GeneralResponse deleteSong(UUID songId)
             throws AppException, InvalidRequestException, InvalidWriteOffsetException, TooManyPartsException,
             EncryptionTypeMismatchException, S3Exception, AwsServiceException, SdkClientException, IOException {
-        
-        throw new UnsupportedOperationException("Unimplemented method 'deleteSong'");
+        requireAdmin();
+
+        if (songId == null) {
+            throw new AppException(ErrorCode.BAD_REQUEST, "Song ID is required.");
+        }
+
+        Song song = songRepository.findById(songId)
+                .orElseThrow(() -> new AppException(
+                        ErrorCode.NOT_FOUND,
+                        Constant.THIS_SONG_WITH_ID + songId + Constant.NOT_FOUND));
+
+        // R2 stores HLS assets under one prefix per song, plus a separate cover image.
+        // Remove storage objects before removing the database record so a storage
+        // failure does not silently leave a song that can no longer be played.
+        deleteR2Prefix("music/hls/" + songId + "/");
+        deleteIfPresent(song.getSongImage());
+        songRepository.delete(song);
+
+        log.info("Song deleted. songId={}", songId);
+        return new GeneralResponse();
+    }
+
+    private void deleteR2Prefix(String prefix) {
+        String continuationToken = null;
+        do {
+            var requestBuilder = ListObjectsV2Request.builder()
+                    .bucket(bucket)
+                    .prefix(prefix)
+                    .maxKeys(1000);
+            if (continuationToken != null) {
+                requestBuilder.continuationToken(continuationToken);
+            }
+
+            var result = s3Client.listObjectsV2(requestBuilder.build());
+            if (!result.contents().isEmpty()) {
+                var objectIdentifiers = result.contents().stream()
+                        .map(object -> ObjectIdentifier.builder().key(object.key()).build())
+                        .toList();
+
+                s3Client.deleteObjects(builder -> builder
+                        .bucket(bucket)
+                        .delete(Delete.builder().objects(objectIdentifiers).build()));
+            }
+            continuationToken = Boolean.TRUE.equals(result.isTruncated())
+                    ? result.nextContinuationToken()
+                    : null;
+        } while (continuationToken != null);
     }
 
     @Override
     public GeneralResponse listSong(Integer page, Integer size, String searchText)
             throws AppException {
-        
-        throw new UnsupportedOperationException("Unimplemented method 'listSong'");
+        if (page == null || page < 0 || size == null || size < 1 || size > 100) {
+            throw new AppException(ErrorCode.BAD_REQUEST,
+                    "Page must be >= 0 and size must be between 1 and 100.");
+        }
+
+        String normalizedSearch = searchText == null || searchText.isBlank()
+                ? null
+                : searchText.trim();
+
+        Page<Song> responsePage = songRepository.searchSongs(
+                normalizedSearch,
+                PageRequest.of(page, size));
+
+        var pagination = GaneralPagination.<Song>builder()
+                .totalPage(responsePage.getTotalPages())
+                .totalElement(responsePage.getTotalElements())
+                .content(responsePage.getContent())
+                .build();
+
+        return new GeneralResponse(pagination);
     }
 }
