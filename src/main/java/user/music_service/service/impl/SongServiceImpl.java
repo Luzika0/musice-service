@@ -61,14 +61,13 @@ public class SongServiceImpl implements SongService {
     public GeneralResponse createArtist(ArtistRequest request) throws AppException {
         requireAdmin();
 
-        final var existArtist = artistRepository.findByArtistName(request.getArtistName());
+        final var existArtist = artistRepository.findByArtistNameAndAlbumName(request.getArtistName(),
+                request.getAlbumName());
 
         if (existArtist != null) {
-            throw new AppException(ErrorCode.ARTIST_EXISTS, "Artist already exists");
-        }
-        if (artistRepository.findByArtistName(request.getArtistName()) != null) {
-            throw new AppException(ErrorCode.BAD_REQUEST,
-                    Constant.THIS_ARTIST_WITH_NAME + request.getArtistName() + Constant.EXIST);
+            throw new AppException(ErrorCode.ARTIST_EXISTS,
+                    "Artist " + request.getArtistName() + "with this album " + request.getAlbumName()
+                            + "already exists");
         }
 
         validateOptionalImage(request.getArtistImage(), "Artist image");
@@ -107,7 +106,7 @@ public class SongServiceImpl implements SongService {
     @Override
     public GeneralResponse updateArtist(ArtistRequest request) throws AppException {
         requireAdmin();
-        Artist artist = artistRepository.findByArtistName(request.getArtistName());
+        Artist artist = artistRepository.findByArtistNameAndAlbumName(request.getArtistName(), request.getAlbumName());
         if (artist == null) {
             throw new AppException(ErrorCode.ARTIST_EXISTS,
                     Constant.THIS_ARTIST_WITH_NAME + request.getArtistName() + Constant.NOT_FOUND);
@@ -154,14 +153,14 @@ public class SongServiceImpl implements SongService {
             throw new AppException(ErrorCode.BAD_REQUEST,
                     "Page must be >= 0 and size must be between 1 and 100.");
         }
-        final var responsePage = artistRepository.findAllOrByArtistNameContainingIgnoreCase(
+        final var responsePage = artistRepository.searchArtistsAndAlbums(
                 searchText, PageRequest.of(page, size));
 
         final var data = responsePage.stream().map(this::toArtistResponse).toList();
         final var pagination = GaneralPagination.builder()
                 .totalPage(responsePage.getTotalPages())
                 .totalElement(responsePage.getTotalElements())
-                .data(data)
+                .content(data)
                 .build();
         return new GeneralResponse(pagination);
     }

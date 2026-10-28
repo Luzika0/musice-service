@@ -7,13 +7,13 @@ import lombok.Data;
 
 @Builder
 @Data
-@JsonPropertyOrder({ "totalPages", "totalElements", "data" })
+@JsonPropertyOrder({ "totalPage", "totalElement", "data" })
 public class GaneralPagination<T> {
 
     private Integer totalPage;
 
     private Long totalElement;
-    
-    private Object data;
+
+    private Object content;
 
 }

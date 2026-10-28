@@ -21,6 +21,7 @@ import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import user.music_service.dto.request.RequestHeaderData;
 import user.music_service.enums.ErrorCode;
 import user.music_service.handler.AppException;
+import user.music_service.service.SongService;
 
 @RestController
 @RequestMapping("/media")
@@ -28,12 +29,19 @@ import user.music_service.handler.AppException;
 public class MediaController {
 
     private final S3Client s3Client;
+    private final SongService songService;
     private final RequestHeaderData requestHeaderData;
 
     @Value("${cloudflare.r2.bucket}")
     private String bucket;
 
-    
+    @GetMapping("/artist")
+    public ResponseEntity<?> getArtist(@RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String searchText) throws AppException {
+        return ResponseEntity.ok().body(songService.viewArtist(page, size, searchText));
+    }
+
     @GetMapping("/image")
     public ResponseEntity<StreamingResponseBody> getImage(@RequestParam String r2Imagekey)
             throws AppException {
@@ -78,7 +86,7 @@ public class MediaController {
                 && !key.contains("..")
                 && !key.contains("\\")
                 && (key.startsWith("music/songImage/")
-                    || key.startsWith("music/artistImage/")
-                    || key.startsWith("music/albumnImage/"));
+                        || key.startsWith("music/artistImage/")
+                        || key.startsWith("music/albumnImage/"));
     }
 }
