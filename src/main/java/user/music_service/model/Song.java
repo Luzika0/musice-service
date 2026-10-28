@@ -24,7 +24,13 @@ public class Song extends BaseEntity {
 
     private String songName;
 
+    /** Private R2 key for music/hls/{songId}/master.m3u8. */
+    @Column(name = "url_song")
     private String urlSong;
+
+    /** Private R2 key for the original song cover image. */
+    @Column(name = "song_image")
+    private String songImage;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "song_type", nullable = false)
