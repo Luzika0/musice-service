@@ -1,4 +1,3 @@
-
 package user.music_service.repository;
 
 import java.util.UUID;
@@ -13,35 +12,37 @@ import user.music_service.model.Song;
 
 public interface SongRepository extends JpaRepository<Song, UUID> {
 
-    @Query(value = """
+    @Query(
+        value = """
             SELECT s.*
             FROM songs s
             LEFT JOIN artist a ON a.artist_id = s.artist_id
             WHERE (
-                CAST(:searchText AS text) IS NULL
-                OR CAST(:searchText AS text) = ''
-                OR LOWER(s.song_name) LIKE
-                   LOWER('%' || CAST(:searchText AS text) || '%')
-                OR LOWER(a.artist_name) LIKE
-                   LOWER('%' || CAST(:searchText AS text) || '%')
-                OR LOWER(a.album_name) LIKE
-                   LOWER('%' || CAST(:searchText AS text) || '%')
+                NULLIF(TRIM(CAST(:searchText AS text)), '') IS NULL
+                OR CAST(s.song_name AS text) ILIKE
+                   '%' || CAST(:searchText AS text) || '%'
+                OR CAST(a.artist_name AS text) ILIKE
+                   '%' || CAST(:searchText AS text) || '%'
+                OR CAST(a.album_name AS text) ILIKE
+                   '%' || CAST(:searchText AS text) || '%'
             )
-            """, countQuery = """
+            """,
+        countQuery = """
             SELECT COUNT(*)
             FROM songs s
             LEFT JOIN artist a ON a.artist_id = s.artist_id
             WHERE (
-                CAST(:searchText AS text) IS NULL
-                OR CAST(:searchText AS text) = ''
-                OR LOWER(s.song_name) LIKE
-                   LOWER('%' || CAST(:searchText AS text) || '%')
-                OR LOWER(a.artist_name) LIKE
-                   LOWER('%' || CAST(:searchText AS text) || '%')
-                OR LOWER(a.album_name) LIKE
-                   LOWER('%' || CAST(:searchText AS text) || '%')
+                NULLIF(TRIM(CAST(:searchText AS text)), '') IS NULL
+                OR CAST(s.song_name AS text) ILIKE
+                   '%' || CAST(:searchText AS text) || '%'
+                OR CAST(a.artist_name AS text) ILIKE
+                   '%' || CAST(:searchText AS text) || '%'
+                OR CAST(a.album_name AS text) ILIKE
+                   '%' || CAST(:searchText AS text) || '%'
             )
-            """, nativeQuery = true)
+            """,
+        nativeQuery = true
+    )
     Page<Song> searchSongs(
             @Param("searchText") String searchText,
             Pageable pageable);
