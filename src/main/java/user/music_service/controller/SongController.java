@@ -31,18 +31,8 @@ public class SongController {
     /**
      * Preferred endpoint. POST makes the session-replacement side effect explicit.
      */
-    @PostMapping("/playback-session")
+    @PostMapping("/playback-token")
     public ResponseEntity<?> createPlaybackSession(@PathVariable UUID songId) throws AppException {
-        return ResponseEntity.ok()
-                .cacheControl(CacheControl.noStore())
-                .body(playbackService.createSession(songId));
-    }
-
-    /**
-     * Legacy endpoint kept for existing clients. Migrate to POST /playback-session.
-     */
-    @GetMapping("/playback-token")
-    public ResponseEntity<?> getPlaybackToken(@PathVariable UUID songId) throws AppException {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(playbackService.createSession(songId));
