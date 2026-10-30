@@ -33,6 +33,7 @@ import user.music_service.dto.request.RequestHeaderData;
 import user.music_service.dto.request.SongRequest;
 import user.music_service.dto.response.ArtistResponse;
 import user.music_service.dto.response.GaneralPagination;
+import user.music_service.dto.response.SongCatalogResponse;
 import user.music_service.enums.ErrorCode;
 import user.music_service.handler.AppException;
 import user.music_service.model.Artist;
@@ -456,10 +457,23 @@ public class SongServiceImpl implements SongService {
                 
                 : songRepository.searchSongs(normalizedSearch, pageable);
 
-        var pagination = GaneralPagination.<Song>builder()
+        var songs = responsePage.getContent().stream()
+                .map(song -> {
+                    Artist artist = artistRepository.findById(song.getArtistId()).orElse(null);
+                    return SongCatalogResponse.builder()
+                            .songId(song.getSongId())
+                            .artistId(song.getArtistId())
+                            .songName(song.getSongName())
+                            .artistName(artist == null ? null : artist.getArtistName())
+                            .songImage(song.getSongImage())
+                            .songType(song.getSongType() == null ? null : song.getSongType().name())
+                            .build();
+                }).toList();
+
+        var pagination = GaneralPagination.<SongCatalogResponse>builder()
                 .totalPage(responsePage.getTotalPages())
                 .totalElement(responsePage.getTotalElements())
-                .content(responsePage.getContent())
+                .content(songs)
                 .build();
 
         return new GeneralResponse(pagination);
