@@ -189,10 +189,20 @@ public class SongServiceImpl implements SongService {
 
         requireAdmin();
 
-        if (request.getArtistId() == null
-                || artistRepository.findById(request.getArtistId()).isEmpty()) {
-            throw new AppException(ErrorCode.NOT_FOUND,
-                    Constant.THIS_ARTIST_WITH_ID + request.getArtistId() + Constant.NOT_FOUND);
+        if (request.getArtistId() == null) {
+            throw new AppException(ErrorCode.BAD_REQUEST, "Artist ID is required.");
+        }
+        Artist selectedArtist = artistRepository.findById(request.getArtistId())
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND,
+                        Constant.THIS_ARTIST_WITH_ID + request.getArtistId() + Constant.NOT_FOUND));
+        if (!Constant.STATUS_ACT.equals(selectedArtist.getStatus())) {
+            throw new AppException(ErrorCode.BAD_REQUEST, "Songs can only be uploaded to an active artist.");
+        }
+        if (request.getSongName() == null || request.getSongName().isBlank()) {
+            throw new AppException(ErrorCode.BAD_REQUEST, "Song name is required.");
+        }
+        if (request.getSongType() == null) {
+            throw new AppException(ErrorCode.BAD_REQUEST, "Song type is required.");
         }
 
         MultipartFile audio = request.getFile();
@@ -219,6 +229,7 @@ public class SongServiceImpl implements SongService {
         try {
             hlsService.processSong(songId, audio);
         } catch (IOException | RuntimeException exception) {
+            cleanupHlsPrefix(songId);
             log.error("Local audio processing/HLS upload failed for songId={}", songId, exception);
             throw new AppException(ErrorCode.BAD_REQUEST,
                     "HLS processing failed. Check server logs and try again.");
@@ -239,6 +250,7 @@ public class SongServiceImpl implements SongService {
             return new GeneralResponse(song);
         } catch (IOException | RuntimeException exception) {
             deleteIfPresent(imageKey);
+            cleanupHlsPrefix(songId);
             log.error("Failed to save song metadata/image for songId={}", songId, exception);
             throw new AppException(ErrorCode.BAD_REQUEST,
                     "Song metadata or cover image could not be saved.");
@@ -288,7 +300,7 @@ public class SongServiceImpl implements SongService {
         }
         if (file.getSize() > MAX_IMAGE_BYTES) {
             throw new AppException(ErrorCode.FILE_SIZE_LIMIT_EXCEEDED,
-                    label + " must not exceed 10 MB.");
+                    label + " must not exceed 20 MB.");
         }
         String contentType = file.getContentType();
         if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
@@ -363,6 +375,14 @@ public class SongServiceImpl implements SongService {
 
         log.info("Song deleted. songId={}", songId);
         return new GeneralResponse();
+    }
+
+    private void cleanupHlsPrefix(UUID songId) {
+        try {
+            deleteR2Prefix("music/hls/" + songId + "/");
+        } catch (RuntimeException cleanupException) {
+            log.warn("Could not clean up incomplete HLS objects for songId={}", songId, cleanupException);
+        }
     }
 
     private void deleteR2Prefix(String prefix) {
