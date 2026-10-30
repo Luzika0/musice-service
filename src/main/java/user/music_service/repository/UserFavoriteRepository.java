@@ -10,4 +10,5 @@ public interface UserFavoriteRepository extends JpaRepository<UserFavorite, User
     List<UserFavorite> findAllByUserIdOrderBySongIdAsc(Integer userId);
     Optional<UserFavorite> findByUserIdAndSongId(Integer userId, UUID songId);
     void deleteByUserIdAndSongId(Integer userId, UUID songId);
+    void deleteAllBySongId(UUID songId);
 }
