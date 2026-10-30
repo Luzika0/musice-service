@@ -195,7 +195,7 @@ public class SongServiceImpl implements SongService {
         Artist selectedArtist = artistRepository.findById(request.getArtistId())
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND,
                         Constant.THIS_ARTIST_WITH_ID + request.getArtistId() + Constant.NOT_FOUND));
-        if (!Constant.STATUS_ACT.equals(selectedArtist.getStatus())) {
+        if (Constant.STATUS_DEL.equals(selectedArtist.getStatus())) {
             throw new AppException(ErrorCode.BAD_REQUEST, "Songs can only be uploaded to an active artist.");
         }
         if (request.getSongName() == null || request.getSongName().isBlank()) {
