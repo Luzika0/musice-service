@@ -15,4 +15,5 @@ public class PlaylistResponse {
     private String coverImage;
     private LocalDateTime createdAt;
     private List<UUID> songIds;
+    private List<PlaylistTrackResponse> songs;
 }
