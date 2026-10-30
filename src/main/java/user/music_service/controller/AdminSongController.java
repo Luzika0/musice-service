@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.SdkClientException;
@@ -31,22 +32,22 @@ import user.music_service.service.SongService;
 public class AdminSongController {
     private final SongService songService;
 
-    @PostMapping("/create-artist")
-    public ResponseEntity<?> createArtist(@ModelAttribute ArtistRequest req) {
-
-        return ResponseEntity.ok().body(songService.createArtist(req));
+    @PostMapping(value = "/create-artist", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> createArtist(@Valid @ModelAttribute ArtistRequest request) {
+        return ResponseEntity.ok(songService.createArtist(request));
     }
 
-    @DeleteMapping("/delete-song")
-    public ResponseEntity<?> delateSong(@PathVariable UUID songId) throws InvalidRequestException,
-            InvalidWriteOffsetException, TooManyPartsException, EncryptionTypeMismatchException, S3Exception,
-            AwsServiceException, SdkClientException, AppException, IOException {
-        return ResponseEntity.ok().body(songService.deleteSong(songId));
+    @DeleteMapping("/delete-song/{songId}")
+    public ResponseEntity<?> deleteSong(@PathVariable UUID songId)
+            throws InvalidRequestException, InvalidWriteOffsetException, TooManyPartsException,
+            EncryptionTypeMismatchException, S3Exception, AwsServiceException, SdkClientException,
+            AppException, IOException {
+        return ResponseEntity.ok(songService.deleteSong(songId));
     }
 
     @PostMapping(value = "/upload-song", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> uploadSong(@ModelAttribute SongRequest request) throws AppException, IOException {
-        return ResponseEntity.ok().body(songService.uploadSongs(request));
+    public ResponseEntity<?> uploadSong(@Valid @ModelAttribute SongRequest request)
+            throws AppException, IOException {
+        return ResponseEntity.ok(songService.uploadSongs(request));
     }
-
 }

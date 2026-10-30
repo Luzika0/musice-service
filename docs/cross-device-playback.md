@@ -8,8 +8,7 @@ The token remains short-lived, song-specific, and stored as a SHA-256 hash. Priv
 
 ## Endpoints
 
-- `POST /song/{songId}/playback-session`: preferred endpoint to create a playback session and revoke older sessions. The response includes `token`, `sessionId`, `expiresAt`, and `songId`.
-- `GET /song/{songId}/playback-token`: legacy compatibility endpoint; migrate clients to POST because creating a session revokes older sessions.
+- `POST /song/{songId}/playback-token`: endpoint implemented by `SongController` and used by K-Song to create a playback session and revoke older sessions. The response includes `token`, `sessionId`, `expiresAt`, and `songId`. The current controller does not expose the older GET variant.
 - `GET /song/{songId}/playback-status`: returns `{"active":true|false}` for the current token. Response caching is disabled.
 - `GET /song/{songId}/playback-events`: authenticated Server-Sent Events (SSE). It sends `playback_taken_over` with `{"active":false,"reason":"SESSION_REPLACED"}` after the token is revoked. A heartbeat is sent every 15 seconds while active.
 
@@ -87,3 +86,36 @@ The client should abort this stream when playback stops or the page is disposed.
 - Keep the SSE endpoint and HLS requests behind the same gateway authentication. Never put playback tokens in query strings.
 - The polling status endpoint is a fallback for clients that cannot keep an SSE stream open.
 - Validate deployment behavior and run the Maven tests before merging.
+
+
+## K-Song frontend API contract
+
+The Angular application calls these routes through the existing Auth Service gateway prefix
+(`/api/auth`). The gateway must strip its configured prefix before forwarding to this service.
+
+| Frontend feature | HTTP method | Music Service route | Request details |
+| --- | --- | --- | --- |
+| Home, Discover, Search, Liked Songs | GET | `/media/list-song?page=0&size=8&searchText=` | Requires trusted `X-User-Id` and bearer authentication at the gateway. `searchText` is optional; blank means all songs. |
+| Artists directory and admin artist picker | GET | `/media/artist?page=0&size=8&searchText=` | Public catalog listing; `searchText` is optional. |
+| Artwork for song and artist cards | GET | `/media/image?r2Imagekey=<private-object-key>` | Requires trusted `X-User-Id`; only approved artwork key prefixes are served. |
+| Creator Studio: create artist | POST | `/admin/create-artist` | Multipart fields: `artistName`, `albumName`, `artistImage`, `albumIamge` (legacy spelling preserved). Admin only. |
+| Creator Studio: upload song | POST | `/admin/upload-song` | Multipart fields: `artistId`, `songName`, `songType`, `file`, `songImage`. Admin only. |
+| Creator Studio: delete song | DELETE | `/admin/delete-song/{songId}` | UUID path variable; no request body. Admin only. |
+| Now Playing: create authorization | POST | `/song/{songId}/playback-token` | Creates the latest session for this user and revokes earlier sessions. |
+| Now Playing: session status | GET | `/song/{songId}/playback-status` | Requires `playBack-token` and trusted `X-User-Id`. |
+| Now Playing: takeover events | GET | `/song/{songId}/playback-events` | SSE; requires `playBack-token` and trusted `X-User-Id`. |
+| Now Playing: HLS playlist/segments | GET | `/song/{songId}/hls/{assetName}` | Private R2 content; requires a valid playback token and authenticated user. |
+
+All catalog list responses use the existing envelope:
+`{ "statusCode": 200, "message": "...", "data": { "totalPage": 0, "totalElement": 0, "content": [] } }`.
+Artist rows expose `artistId`, `artistName`, `albumName`, `artistImage`, and `albumImage`.
+Song rows expose the persisted song fields including `songId`, `artistId`, `songName`,
+`songImage`, and `songType`. The frontend should not invent artist IDs or treat an artist ID
+as a song ID.
+
+The Creator Studio's delete URL is deliberately path-based. The controller must declare
+`@DeleteMapping("/delete-song/{songId}")`; a `@PathVariable` cannot be bound to a route
+that does not contain the variable.
+
+The Library and Liked Songs screens currently use device-local demo/library state; they do not
+call server playlist or favorite endpoints. No server playlist API is implied by those pages.
