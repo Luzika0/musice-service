@@ -1,6 +1,7 @@
 package user.music_service.service.impl;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -36,8 +37,11 @@ import user.music_service.enums.ErrorCode;
 import user.music_service.handler.AppException;
 import user.music_service.model.Artist;
 import user.music_service.model.Song;
+import user.music_service.model.PlaylistSong;
 import user.music_service.repository.ArtistRepository;
 import user.music_service.repository.SongRepository;
+import user.music_service.repository.PlaylistSongRepository;
+import user.music_service.repository.UserFavoriteRepository;
 import user.music_service.repository.UserRepository;
 import user.music_service.service.HlsService;
 import user.music_service.service.SongService;
@@ -57,6 +61,8 @@ public class SongServiceImpl implements SongService {
     private final ArtistRepository artistRepository;
     private final S3Client s3Client;
     private final SongRepository songRepository;
+    private final UserFavoriteRepository userFavoriteRepository;
+    private final PlaylistSongRepository playlistSongRepository;
 
     @Value("${cloudflare.r2.bucket}")
     private String bucket;
@@ -371,6 +377,23 @@ public class SongServiceImpl implements SongService {
         
         deleteR2Prefix("music/hls/" + songId + "/");
         deleteIfPresent(song.getSongImage());
+
+        // Remove account-library references before deleting the catalog record.
+        userFavoriteRepository.deleteAllBySongId(songId);
+        List<PlaylistSong> affectedPlaylistRows = playlistSongRepository.findAllBySongId(songId);
+        List<Long> affectedPlaylistIds = affectedPlaylistRows.stream()
+                .map(PlaylistSong::getPlaylistId)
+                .distinct()
+                .toList();
+        playlistSongRepository.deleteAllBySongId(songId);
+        for (Long playlistId : affectedPlaylistIds) {
+            List<PlaylistSong> remaining = playlistSongRepository
+                    .findAllByPlaylistIdOrderByPositionAsc(playlistId);
+            for (int index = 0; index < remaining.size(); index++) {
+                remaining.get(index).setPosition(index);
+            }
+            playlistSongRepository.saveAll(remaining);
+        }
         songRepository.delete(song);
 
         log.info("Song deleted. songId={}", songId);
