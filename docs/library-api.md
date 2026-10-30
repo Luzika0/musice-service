@@ -45,7 +45,7 @@ Reorder body:
 ]
 ```
 
-The reorder operation requires every song currently in the playlist exactly once. Playlist IDs are scoped to the authenticated user; another user's playlist is returned as not found. The schema is managed by JPA schema update in the current Music Service configuration and creates `user_favorites`, `user_playlists`, and `playlist_songs` tables.
+The reorder operation requires every song currently in the playlist exactly once. Playlist IDs are scoped to the authenticated user; another user's playlist is returned as not found. When an admin deletes a catalog song, its favorite rows and playlist entries are removed and the remaining playlist positions are compacted. The schema is managed by JPA schema update in the current Music Service configuration and creates `user_favorites`, `user_playlists`, and `playlist_songs` tables.
 
 ## Angular usage
 
