@@ -8,8 +8,7 @@ The token remains short-lived, song-specific, and stored as a SHA-256 hash. Priv
 
 ## Endpoints
 
-- `POST /song/{songId}/playback-session`: preferred endpoint to create a playback session and revoke older sessions. The response includes `token`, `sessionId`, `expiresAt`, and `songId`.
-- `GET /song/{songId}/playback-token`: legacy compatibility endpoint; migrate clients to POST because creating a session revokes older sessions.
+- `POST /song/{songId}/playback-token`: endpoint implemented by `SongController` and used by K-Song to create a playback session and revoke older sessions. The response includes `token`, `sessionId`, `expiresAt`, and `songId`. The current controller does not expose the older GET variant.
 - `GET /song/{songId}/playback-status`: returns `{"active":true|false}` for the current token. Response caching is disabled.
 - `GET /song/{songId}/playback-events`: authenticated Server-Sent Events (SSE). It sends `playback_taken_over` with `{"active":false,"reason":"SESSION_REPLACED"}` after the token is revoked. A heartbeat is sent every 15 seconds while active.
 
