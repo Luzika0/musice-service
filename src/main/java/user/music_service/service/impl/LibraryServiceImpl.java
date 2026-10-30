@@ -77,7 +77,10 @@ public class LibraryServiceImpl implements LibraryService {
     public GeneralResponse addFavorite(Integer userId, UUID songId) throws AppException {
         requireUser(userId);
         requireSong(songId);
-        if (!favoriteRepository.existsById(new UserFavorite.FavoriteId(userId, songId))) {
+        UserFavorite.FavoriteId favoriteId = new UserFavorite.FavoriteId();
+        favoriteId.setUserId(userId);
+        favoriteId.setSongId(songId);
+        if (!favoriteRepository.existsById(favoriteId)) {
             UserFavorite favorite = new UserFavorite();
             favorite.setUserId(userId);
             favorite.setSongId(songId);
