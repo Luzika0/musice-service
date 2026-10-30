@@ -9,6 +9,9 @@ import lombok.RequiredArgsConstructor;
 import user.music_service.dto.GeneralResponse;
 import user.music_service.dto.request.PlaylistRequest;
 import user.music_service.dto.response.PlaylistResponse;
+import user.music_service.dto.response.PlaylistTrackResponse;
+import user.music_service.model.Artist;
+import user.music_service.repository.ArtistRepository;
 import user.music_service.enums.ErrorCode;
 import user.music_service.handler.AppException;
 import user.music_service.model.PlaylistSong;
@@ -28,6 +31,7 @@ import user.music_service.service.LibraryService;
 public class LibraryServiceImpl implements LibraryService {
     private final UserRepository userRepository;
     private final SongRepository songRepository;
+    private final ArtistRepository artistRepository;
     private final UserFavoriteRepository favoriteRepository;
     private final UserPlaylistRepository playlistRepository;
     private final PlaylistSongRepository playlistSongRepository;
@@ -51,8 +55,26 @@ public class LibraryServiceImpl implements LibraryService {
     }
 
     private PlaylistResponse response(UserPlaylist playlist) {
-        List<UUID> ids = playlistSongRepository.findAllByPlaylistIdOrderByPositionAsc(playlist.getPlaylistId())
-                .stream().map(PlaylistSong::getSongId).toList();
+        List<PlaylistTrackResponse> tracks = playlistSongRepository
+                .findAllByPlaylistIdOrderByPositionAsc(playlist.getPlaylistId())
+                .stream()
+                .map(row -> {
+                    Song song = songRepository.findById(row.getSongId()).orElse(null);
+                    if (song == null) return null;
+                    Artist artist = artistRepository.findById(song.getArtistId()).orElse(null);
+                    return PlaylistTrackResponse.builder()
+                            .songId(song.getSongId())
+                            .artistId(song.getArtistId())
+                            .songName(song.getSongName())
+                            .artistName(artist == null ? null : artist.getArtistName())
+                            .songImage(song.getSongImage())
+                            .songType(song.getSongType() == null ? null : song.getSongType().name())
+                            .position(row.getPosition())
+                            .build();
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        List<UUID> ids = tracks.stream().map(PlaylistTrackResponse::getSongId).toList();
         return PlaylistResponse.builder()
                 .playlistId(playlist.getPlaylistId())
                 .name(playlist.getName())
@@ -60,6 +82,7 @@ public class LibraryServiceImpl implements LibraryService {
                 .coverImage(playlist.getCoverImage())
                 .createdAt(playlist.getCreateAt())
                 .songIds(ids)
+                .songs(tracks)
                 .build();
     }
 
