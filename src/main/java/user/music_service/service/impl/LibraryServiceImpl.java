@@ -10,6 +10,7 @@ import user.music_service.dto.GeneralResponse;
 import user.music_service.dto.request.PlaylistRequest;
 import user.music_service.dto.response.PlaylistResponse;
 import user.music_service.dto.response.PlaylistTrackResponse;
+import user.music_service.dto.response.FavoriteSongResponse;
 import user.music_service.model.Artist;
 import user.music_service.repository.ArtistRepository;
 import user.music_service.enums.ErrorCode;
@@ -90,9 +91,20 @@ public class LibraryServiceImpl implements LibraryService {
     @Transactional(readOnly = true)
     public GeneralResponse listFavorites(Integer userId) throws AppException {
         requireUser(userId);
-        List<Song> songs = favoriteRepository.findAllByUserIdOrderBySongIdAsc(userId).stream()
+        List<FavoriteSongResponse> songs = favoriteRepository.findAllByUserIdOrderBySongIdAsc(userId).stream()
                 .map(f -> songRepository.findById(f.getSongId()).orElse(null))
-                .filter(java.util.Objects::nonNull).toList();
+                .filter(java.util.Objects::nonNull)
+                .map(song -> {
+                    Artist artist = artistRepository.findById(song.getArtistId()).orElse(null);
+                    return FavoriteSongResponse.builder()
+                            .songId(song.getSongId())
+                            .artistId(song.getArtistId())
+                            .songName(song.getSongName())
+                            .artistName(artist == null ? null : artist.getArtistName())
+                            .songImage(song.getSongImage())
+                            .songType(song.getSongType() == null ? null : song.getSongType().name())
+                            .build();
+                }).toList();
         return new GeneralResponse(songs);
     }
 
